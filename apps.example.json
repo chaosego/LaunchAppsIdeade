@@ -7,20 +7,20 @@
   },
   "apps": [
     {
-      "id": "web-next",
-      "name": "Web Next",
-      "type": "next",
-      "cwd": "C:/proyectos/web-next",
+      "id": "leroy-server",
+      "name": "Servidor Leroy",
+      "type": "node",
+      "cwd": "T:/Servidores/leroy.server",
       "command": "npm",
       "args": ["run", "start"],
       "env": { "NODE_ENV": "production" },
-      "port": 3000,
+      "port": 5001,
       "autostart": true,
       "health": {
-        "http": { "url": "http://localhost:3000/", "expectStatus": 200 },
+        "http": { "url": "http://localhost:5001/numeracion/", "expectStatus": 200 },
         "tcp": { "port": 3000 },
         "latencyWarnMs": 2000,
-        "command": { "run": "curl -fsS http://localhost:3000/", "timeoutMs": 4000 }
+        "command": { "run": "curl -fsS http://localhost:5001/numeracion", "timeoutMs": 4000 }
       },
       "watchdog": {
         "enabled": true,
@@ -29,17 +29,17 @@
       }
     },
     {
-      "id": "api-sails",
-      "name": "API Sails",
-      "type": "sails",
-      "cwd": "C:/proyectos/api-sails",
-      "command": "node",
-      "args": ["app.js"],
-      "port": 1337,
+      "id": "leroy-cliente",
+      "name": "Cliente Leroy",
+      "type": "next",
+      "cwd": "T:/Servidores/leroy.cliente",
+      "command": "npm",
+      "args": ["run", "start --port=3000"],
+      "port": 3000,
       "autostart": false,
       "health": {
-        "tcp": { "port": 1337 },
-        "http": { "url": "http://localhost:1337/health", "expectStatus": 200 },
+        "tcp": { "port": 3000 },
+        "http": { "url": "http://localhost:3000", "expectStatus": 200 },
         "latencyWarnMs": 3000
       },
       "watchdog": {

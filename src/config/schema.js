@@ -112,6 +112,7 @@ function validateWatchdog(raw, appLabel, defaultInterval) {
     enabled: false,
     intervalMinutes: defaultInterval,
     restartOnUnhealthy: true,
+    maxRetries: 3,
   };
   if (raw === undefined) return { watchdog, errors };
   if (!isObject(raw)) {
@@ -130,6 +131,10 @@ function validateWatchdog(raw, appLabel, defaultInterval) {
   if (raw.restartOnUnhealthy !== undefined) {
     if (typeof raw.restartOnUnhealthy === 'boolean') watchdog.restartOnUnhealthy = raw.restartOnUnhealthy;
     else errors.push(`${appLabel}: watchdog.restartOnUnhealthy debe ser booleano.`);
+  }
+  if (raw.maxRetries !== undefined) {
+    if (isPositiveInt(raw.maxRetries)) watchdog.maxRetries = raw.maxRetries;
+    else errors.push(`${appLabel}: watchdog.maxRetries debe ser un entero positivo.`);
   }
 
   return { watchdog, errors };

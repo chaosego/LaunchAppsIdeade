@@ -5,6 +5,8 @@ const express = require('express');
 const { loadConfig } = require('./config/loader');
 const { ProcessManager } = require('./services/processManager');
 const { HealthMonitor } = require('./services/healthMonitor');
+const { Watchdog } = require('./services/watchdog');
+const { runAutostart } = require('./services/autostart');
 const createIndexRouter = require('./routes/index');
 const createEventsRouter = require('./routes/events');
 const createActionsRouter = require('./routes/actions');
@@ -24,6 +26,14 @@ function createApp() {
 
   // Monitor de health (M2): polling periódico + transiciones running<->unhealthy.
   app.locals.healthMonitor = new HealthMonitor(app.locals.pm, () => app.locals.config.settings);
+
+  // Watchdog (M4): relanza apps caídas/colgadas según config por app.
+  app.locals.watchdog = new Watchdog(
+    app.locals.pm,
+    () => app.locals.config.settings,
+    () => app.locals.config.apps
+  );
+  app.locals.watchdog.on('event', ({ type, id, message }) => console.log(`[watchdog:${id}] ${type}: ${message}`));
 
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
@@ -57,6 +67,10 @@ function start() {
       for (const e of errors) console.warn(`[config] ${e}`);
     }
     app.locals.healthMonitor.start();
+    app.locals.watchdog.start();
+
+    // Autostart (M4): lanza apps marcadas, escalonadas.
+    runAutostart(app.locals.pm, apps, { log: (m) => console.log(`[LaunchApps] ${m}`) });
   });
 }
 
