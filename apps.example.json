@@ -36,7 +36,7 @@
       "command": "npm",
       "args": ["run", "start --port=3000"],
       "port": 3000,
-      "autostart": false,
+      "autostart": true,
       "health": {
         "tcp": { "port": 3000 },
         "http": { "url": "http://localhost:3000", "expectStatus": 200 },
@@ -44,6 +44,27 @@
       },
       "watchdog": {
         "enabled": false
+      }
+    },
+    {
+      "id": "servidor-amazon",
+      "name": "Servidor Amazon a Contasol",
+      "type": "node",
+      "cwd": "T:/Servidores/AMZ2FSOL.Server",
+      "command": "npm",
+      "args": ["run", "start"],
+      "port": 5000,
+      "autostart": true,
+      "health": {
+        "http": { "url": "http://localhost:5000/numeracion", "expectStatus": 200 },
+        "tcp": { "port": 5000 },
+        "latencyWarnMs": 2000,
+        "command": { "run": "curl -fsS http://localhost:5000/numeracion", "timeoutMs": 4000 }
+      },
+      "watchdog": {
+        "enabled": true,
+        "intervalMinutes": 150,
+        "restartOnUnhealthy": true
       }
     }
   ]
