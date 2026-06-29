@@ -10,9 +10,17 @@ const express = require('express');
 function createEventsRouter() {
   const router = express.Router();
 
+  // Historial de eventos persistido (issue #21).
+  router.get('/log', (req, res) => {
+    const eventLog = req.app.locals.eventLog;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    res.json({ events: eventLog ? eventLog.list(limit) : [] });
+  });
+
   router.get('/status', (req, res) => {
     const pm = req.app.locals.pm;
     const monitor = req.app.locals.healthMonitor;
+    const eventLog = req.app.locals.eventLog;
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -32,8 +40,10 @@ function createEventsRouter() {
 
     const onState = (payload) => send('state', payload);
     const onHealth = (payload) => send('health', payload);
+    const onEvent = (payload) => send('appevent', payload);
     pm.on('state', onState);
     if (monitor) monitor.on('health', onHealth);
+    if (eventLog) eventLog.on('event', onEvent);
 
     // Keep-alive (comentario SSE) para evitar cierres por inactividad.
     const ka = setInterval(() => res.write(': keep-alive\n\n'), 25000);
@@ -42,6 +52,7 @@ function createEventsRouter() {
       clearInterval(ka);
       pm.removeListener('state', onState);
       if (monitor) monitor.removeListener('health', onHealth);
+      if (eventLog) eventLog.removeListener('event', onEvent);
     });
   });
 

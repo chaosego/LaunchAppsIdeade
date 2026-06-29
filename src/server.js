@@ -7,9 +7,14 @@ const { ProcessManager } = require('./services/processManager');
 const { HealthMonitor } = require('./services/healthMonitor');
 const { Watchdog } = require('./services/watchdog');
 const { runAutostart } = require('./services/autostart');
+const { LogStore } = require('./services/logStore');
+const { EventLog } = require('./services/eventLog');
+const { ConfigManager } = require('./config/manager');
 const createIndexRouter = require('./routes/index');
 const createEventsRouter = require('./routes/events');
 const createActionsRouter = require('./routes/actions');
+const createConfigRouter = require('./routes/config');
+const createLogsRouter = require('./routes/logs');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -35,6 +40,23 @@ function createApp() {
   );
   app.locals.watchdog.on('event', ({ type, id, message }) => console.log(`[watchdog:${id}] ${type}: ${message}`));
 
+  // Logs en vivo (M5 #20): captura stdout/stderr a buffer + archivo.
+  app.locals.logStore = new LogStore(app.locals.pm, { dir: path.join(ROOT, 'logs') });
+
+  // Log de eventos (M5 #21): persiste caídas/restarts/recargas.
+  app.locals.eventLog = new EventLog(app.locals.pm, { dir: path.join(ROOT, 'data') });
+  app.locals.eventLog.attachWatchdog(app.locals.watchdog);
+
+  // Gestor de config en caliente (M5 #18, #19).
+  app.locals.configManager = new ConfigManager({
+    getConfig: () => app.locals.config,
+    setConfig: (c) => { app.locals.config = c; },
+    pm: app.locals.pm,
+    getWatchdog: () => app.locals.watchdog,
+    getHealthMonitor: () => app.locals.healthMonitor,
+  });
+  app.locals.eventLog.attachConfigManager(app.locals.configManager);
+
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
 
@@ -44,7 +66,9 @@ function createApp() {
 
   app.use('/', createIndexRouter());
   app.use('/events', createEventsRouter());
+  app.use('/apps', createLogsRouter());
   app.use('/apps', createActionsRouter());
+  app.use('/config', createConfigRouter());
 
   // 404 simple
   app.use((req, res) => {
@@ -68,6 +92,7 @@ function start() {
     }
     app.locals.healthMonitor.start();
     app.locals.watchdog.start();
+    app.locals.configManager.watch(); // recarga en caliente al editar apps.json
 
     // Autostart (M4): lanza apps marcadas, escalonadas.
     runAutostart(app.locals.pm, apps, { log: (m) => console.log(`[LaunchApps] ${m}`) });

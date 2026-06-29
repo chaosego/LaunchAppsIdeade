@@ -17,52 +17,97 @@
     <button data-global="stop-all">■ Parar todas</button>
     <button data-global="restart-all">↻ Reiniciar todas</button>
     <button data-global="refresh-all">⟳ Refrescar estado</button>
+    <button id="btn-add" class="primary">＋ Añadir app</button>
   </div>
   <span id="conn" class="conn conn-off" title="Conexión SSE">● desconectado</span>
 </section>
 
-<section class="apps">
-  <% if (!apps.length) { %>
-    <p class="empty">No hay apps configuradas. Editá <code>apps.json</code> (plantilla en <code>apps.example.json</code>).</p>
-  <% } else { %>
-    <table class="apps-table">
-      <thead>
-        <tr>
-          <th>App</th>
-          <th>Tipo</th>
-          <th>Puerto</th>
-          <th>Estado</th>
-          <th>Latencia</th>
-          <th>Autostart</th>
-          <th>Watchdog</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% apps.forEach(function (app) { %>
-          <tr data-app-id="<%= app.id %>">
-            <td>
-              <span class="app-name"><%= app.name %></span>
-              <span class="app-id muted"><%= app.id %></span>
-            </td>
-            <td><%= app.type %></td>
-            <td><%= app.port || '—' %></td>
-            <td><span class="status status-stopped" data-role="status">stopped</span></td>
-            <td><span data-role="latency" class="muted">—</span></td>
-            <td><%= app.autostart ? 'sí' : 'no' %></td>
-            <td><%= app.watchdog && app.watchdog.enabled ? app.watchdog.intervalMinutes + ' min' : 'off' %></td>
-            <td class="actions">
-              <button data-action="start" title="Iniciar">▶</button>
-              <button data-action="stop" title="Parar">■</button>
-              <button data-action="restart" title="Reiniciar">↻</button>
-              <button data-action="pause" title="Pausar">⏸</button>
-              <button data-action="resume" title="Reanudar">⏵</button>
-            </td>
+<div class="layout">
+  <section class="apps">
+    <% if (!apps.length) { %>
+      <p class="empty">No hay apps configuradas. Pulsá <strong>Añadir app</strong> o editá <code>apps.json</code>.</p>
+    <% } else { %>
+      <table class="apps-table">
+        <thead>
+          <tr>
+            <th>App</th><th>Tipo</th><th>Puerto</th><th>Estado</th><th>Latencia</th>
+            <th>Autostart</th><th>Watchdog</th><th>Acciones</th>
           </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  <% } %>
-</section>
+        </thead>
+        <tbody id="apps-body">
+          <% apps.forEach(function (app) { %>
+            <tr data-app-id="<%= app.id %>">
+              <td><span class="app-name"><%= app.name %></span><span class="app-id muted"><%= app.id %></span></td>
+              <td><%= app.type %></td>
+              <td><%= app.port || '—' %></td>
+              <td><span class="status status-stopped" data-role="status">stopped</span></td>
+              <td><span data-role="latency" class="muted">—</span></td>
+              <td><%= app.autostart ? 'sí' : 'no' %></td>
+              <td><%= app.watchdog && app.watchdog.enabled ? app.watchdog.intervalMinutes + ' min' : 'off' %></td>
+              <td class="actions">
+                <button data-action="start" title="Iniciar">▶</button>
+                <button data-action="stop" title="Parar">■</button>
+                <button data-action="restart" title="Reiniciar">↻</button>
+                <button data-action="pause" title="Pausar">⏸</button>
+                <button data-action="resume" title="Reanudar">⏵</button>
+                <button data-logs title="Ver logs">📄</button>
+                <button data-edit title="Editar">✎</button>
+                <button data-delete title="Eliminar">🗑</button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+
+  <aside class="events-panel">
+    <h2>Eventos</h2>
+    <ul id="events-list" class="events-list"><li class="muted">cargando…</li></ul>
+  </aside>
+</div>
+
+<!-- Modal: alta / edición de app -->
+<div id="modal-app" class="modal hidden">
+  <div class="modal-box">
+    <h2 id="modal-app-title">Añadir app</h2>
+    <form id="app-form">
+      <input type="hidden" name="_editId" />
+      <label>ID <input name="id" required placeholder="web-next" /></label>
+      <label>Nombre <input name="name" required placeholder="Web Next" /></label>
+      <label>Tipo
+        <select name="type">
+          <option value="next">next</option>
+          <option value="node">node</option>
+          <option value="sails">sails</option>
+          <option value="custom">custom</option>
+        </select>
+      </label>
+      <label>cwd <input name="cwd" required placeholder="C:/proyectos/web-next" /></label>
+      <label>Comando <input name="command" required placeholder="npm" /></label>
+      <label>Args (separados por espacio) <input name="args" placeholder="run start" /></label>
+      <label>Puerto <input name="port" type="number" placeholder="3000" /></label>
+      <label class="check"><input name="autostart" type="checkbox" /> Autostart</label>
+      <label>health (JSON) <textarea name="health" rows="4" placeholder='{ "http": { "url": "http://localhost:3000/" }, "tcp": { "port": 3000 } }'></textarea></label>
+      <label>watchdog (JSON) <textarea name="watchdog" rows="3" placeholder='{ "enabled": true, "intervalMinutes": 150 }'></textarea></label>
+      <p id="app-form-error" class="form-error hidden"></p>
+      <div class="modal-actions">
+        <button type="button" data-close>Cancelar</button>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: logs -->
+<div id="modal-logs" class="modal hidden">
+  <div class="modal-box modal-logs-box">
+    <h2 id="modal-logs-title">Logs</h2>
+    <pre id="logs-output" class="logs-output"></pre>
+    <div class="modal-actions"><button type="button" data-close>Cerrar</button></div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
 
 <%- include('partials/foot') %>
