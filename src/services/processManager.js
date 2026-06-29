@@ -1,6 +1,7 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const fs = require('fs');
 const net = require('net');
 const { EventEmitter } = require('events');
 const { STATES, canTransition, isLive } = require('./states');
@@ -103,6 +104,14 @@ class ProcessManager extends EventEmitter {
     }
 
     const { app } = entry;
+
+    // Edge case: cwd inexistente -> mensaje claro en vez de un ENOENT críptico.
+    if (app.cwd && !fs.existsSync(app.cwd)) {
+      this._setStatus(entry, STATES.CRASHED);
+      this.emit('warn', { id, message: `el directorio cwd no existe: ${app.cwd}` });
+      return { id, status: entry.status, error: `cwd no existe: ${app.cwd}` };
+    }
+
     this._setStatus(entry, STATES.STARTING);
     entry.intentionalStop = false;
     entry.exitCode = null;

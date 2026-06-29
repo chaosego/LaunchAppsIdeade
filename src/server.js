@@ -7,6 +7,7 @@ const { ProcessManager } = require('./services/processManager');
 const { HealthMonitor } = require('./services/healthMonitor');
 const { Watchdog } = require('./services/watchdog');
 const { runAutostart } = require('./services/autostart');
+const { reconcileExternal } = require('./services/reconcile');
 const { LogStore } = require('./services/logStore');
 const { EventLog } = require('./services/eventLog');
 const { ConfigManager } = require('./config/manager');
@@ -75,6 +76,14 @@ function createApp() {
     res.status(404).send('Not found');
   });
 
+  // Manejo global de errores de rutas: nunca tumbar el panel (issue #22).
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    console.error('[error]', err.message);
+    if (res.headersSent) return;
+    res.status(500).json({ ok: false, error: err.message });
+  });
+
   return app;
 }
 
@@ -94,12 +103,42 @@ function start() {
     app.locals.watchdog.start();
     app.locals.configManager.watch(); // recarga en caliente al editar apps.json
 
-    // Autostart (M4): lanza apps marcadas, escalonadas.
-    runAutostart(app.locals.pm, apps, { log: (m) => console.log(`[LaunchApps] ${m}`) });
+    bootstrap(app);
+  });
+}
+
+/**
+ * Arranque post-listen (M6): detecta instancias externas/huérfanas y luego
+ * autostart, evitando relanzar apps que ya están accesibles.
+ */
+async function bootstrap(app) {
+  const { pm, eventLog, config } = app.locals;
+  const apps = config.apps;
+  const timeoutMs = config.settings.healthTimeoutMs;
+
+  let externalUp = [];
+  try {
+    externalUp = await reconcileExternal(pm, apps, {
+      timeoutMs,
+      onExternal: (id, message) => {
+        console.warn(`[LaunchApps] huérfana/externa: ${id} — ${message}`);
+        if (eventLog) eventLog.record(id, 'warn', 'external', message);
+      },
+    });
+  } catch (err) {
+    console.error('[LaunchApps] reconcile falló:', err.message);
+  }
+
+  runAutostart(pm, apps, {
+    skip: externalUp,
+    log: (m) => console.log(`[LaunchApps] ${m}`),
   });
 }
 
 if (require.main === module) {
+  // El panel no debe morir por un error no capturado (issue #22).
+  process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+  process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
   start();
 }
 

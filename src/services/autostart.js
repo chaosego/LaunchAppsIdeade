@@ -10,10 +10,12 @@
  * @param {object} [opts]
  * @param {number} [opts.staggerMs=1500]  separación entre lanzamientos
  * @param {(msg: string) => void} [opts.log]
+ * @param {string[]} [opts.skip]          ids a no lanzar (p.ej. ya accesibles)
  * @returns {Promise<string[]>}     ids lanzados
  */
-async function runAutostart(pm, apps, { staggerMs = 1500, log = () => {} } = {}) {
-  const targets = apps.filter((a) => a.autostart);
+async function runAutostart(pm, apps, { staggerMs = 1500, log = () => {}, skip = [] } = {}) {
+  const skipSet = new Set(skip);
+  const targets = apps.filter((a) => a.autostart && !skipSet.has(a.id));
   const launched = [];
   for (let i = 0; i < targets.length; i++) {
     const app = targets[i];
