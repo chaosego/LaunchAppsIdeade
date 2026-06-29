@@ -1,4 +1,4 @@
-Aplicacion web, basada en node para trabajo en local, con la siguiente misión:
+Aplicacion web, basada en node para trabajo en local, bajo windows, con la siguiente misión:
 
 - Comprobar de una lista de aplicaciones  y puertos dados, si la aplicacion esta corriendo comprobar el proceso y el puerto establecido para ver si el sistema esta activo de alguna manera, algunas son apps en next y otros son servidores en node o en sails.
 - Debe mostrarlos en una web, el estado y opciones de reinicio de las aplicaciones.
