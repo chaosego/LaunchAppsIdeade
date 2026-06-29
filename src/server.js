@@ -3,6 +3,7 @@
 const path = require('path');
 const express = require('express');
 const { loadConfig } = require('./config/loader');
+const { ProcessManager } = require('./services/processManager');
 const createIndexRouter = require('./routes/index');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -12,6 +13,11 @@ function createApp() {
 
   // Config cargada al arrancar. En M5 se añadirá recarga en caliente.
   app.locals.config = loadConfig();
+
+  // Gestor de procesos (M1). Las rutas de acción se cablean en M3.
+  app.locals.pm = new ProcessManager(app.locals.config.apps);
+  app.locals.pm.on('warn', ({ id, message }) => console.warn(`[pm:${id}] ${message}`));
+  app.locals.pm.on('state', ({ id, prev, status }) => console.log(`[pm:${id}] ${prev} -> ${status}`));
 
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
