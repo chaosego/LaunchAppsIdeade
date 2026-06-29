@@ -76,16 +76,46 @@ body {
   font-weight: 600;
 }
 .status-running { background: rgba(46, 204, 113, 0.15); color: var(--ok); }
-.status-stopped { background: rgba(231, 76, 60, 0.15); color: var(--bad); }
-.status-unknown { background: rgba(138, 144, 155, 0.15); color: var(--unknown); }
+.status-stopped { background: rgba(138, 144, 155, 0.15); color: var(--unknown); }
+.status-starting { background: rgba(76, 139, 245, 0.15); color: var(--accent); }
+.status-unhealthy { background: rgba(243, 156, 18, 0.18); color: #f39c12; }
+.status-paused { background: rgba(155, 89, 182, 0.18); color: #b07cc6; }
+.status-crashed { background: rgba(231, 76, 60, 0.18); color: var(--bad); }
+
+.warn { color: #f39c12; font-size: 0.85rem; }
 
 .actions button {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.2rem 0.55rem;
-  margin-right: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  margin-right: 0.15rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.actions button:hover { border-color: var(--accent); }
+.actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+.global-buttons button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  margin-right: 0.4rem;
   cursor: pointer;
 }
-.actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.global-buttons button:hover { border-color: var(--accent); }
+.global-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.conn { font-size: 0.8rem; white-space: nowrap; }
+.conn-on { color: var(--ok); }
+.conn-off { color: var(--muted); }

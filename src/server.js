@@ -7,6 +7,7 @@ const { ProcessManager } = require('./services/processManager');
 const { HealthMonitor } = require('./services/healthMonitor');
 const createIndexRouter = require('./routes/index');
 const createEventsRouter = require('./routes/events');
+const createActionsRouter = require('./routes/actions');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -33,6 +34,7 @@ function createApp() {
 
   app.use('/', createIndexRouter());
   app.use('/events', createEventsRouter());
+  app.use('/apps', createActionsRouter());
 
   // 404 simple
   app.use((req, res) => {

@@ -11,6 +11,16 @@
   </section>
 <% } %>
 
+<section class="toolbar">
+  <div class="global-buttons">
+    <button data-global="start-all">▶ Iniciar todas</button>
+    <button data-global="stop-all">■ Parar todas</button>
+    <button data-global="restart-all">↻ Reiniciar todas</button>
+    <button data-global="refresh-all">⟳ Refrescar estado</button>
+  </div>
+  <span id="conn" class="conn conn-off" title="Conexión SSE">● desconectado</span>
+</section>
+
 <section class="apps">
   <% if (!apps.length) { %>
     <p class="empty">No hay apps configuradas. Editá <code>apps.json</code> (plantilla en <code>apps.example.json</code>).</p>
@@ -22,6 +32,7 @@
           <th>Tipo</th>
           <th>Puerto</th>
           <th>Estado</th>
+          <th>Latencia</th>
           <th>Autostart</th>
           <th>Watchdog</th>
           <th>Acciones</th>
@@ -36,14 +47,16 @@
             </td>
             <td><%= app.type %></td>
             <td><%= app.port || '—' %></td>
-            <td><span class="status status-unknown" data-role="status">desconocido</span></td>
+            <td><span class="status status-stopped" data-role="status">stopped</span></td>
+            <td><span data-role="latency" class="muted">—</span></td>
             <td><%= app.autostart ? 'sí' : 'no' %></td>
             <td><%= app.watchdog && app.watchdog.enabled ? app.watchdog.intervalMinutes + ' min' : 'off' %></td>
             <td class="actions">
-              <!-- Botones reales en M3 -->
-              <button disabled title="Disponible en M3">start</button>
-              <button disabled title="Disponible en M3">stop</button>
-              <button disabled title="Disponible en M3">restart</button>
+              <button data-action="start" title="Iniciar">▶</button>
+              <button data-action="stop" title="Parar">■</button>
+              <button data-action="restart" title="Reiniciar">↻</button>
+              <button data-action="pause" title="Pausar">⏸</button>
+              <button data-action="resume" title="Reanudar">⏵</button>
             </td>
           </tr>
         <% }); %>
