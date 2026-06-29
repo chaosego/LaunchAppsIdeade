@@ -8,6 +8,8 @@ const { HealthMonitor } = require('./services/healthMonitor');
 const { Watchdog } = require('./services/watchdog');
 const { runAutostart } = require('./services/autostart');
 const { reconcileExternal } = require('./services/reconcile');
+const { adoptOrphans } = require('./services/adopt');
+const { PidStore } = require('./services/pidStore');
 const { LogStore } = require('./services/logStore');
 const { EventLog } = require('./services/eventLog');
 const { ConfigManager } = require('./config/manager');
@@ -25,8 +27,11 @@ function createApp() {
   // Config cargada al arrancar. En M5 se añadirá recarga en caliente.
   app.locals.config = loadConfig();
 
+  // Persistencia de PIDs para re-adopción de huérfanos (#24).
+  app.locals.pidStore = new PidStore({ dir: path.join(ROOT, 'data') });
+
   // Gestor de procesos (M1). Las rutas de acción se cablean en M3.
-  app.locals.pm = new ProcessManager(app.locals.config.apps);
+  app.locals.pm = new ProcessManager(app.locals.config.apps, { pidStore: app.locals.pidStore });
   app.locals.pm.on('warn', ({ id, message }) => console.warn(`[pm:${id}] ${message}`));
   app.locals.pm.on('state', ({ id, prev, status }) => console.log(`[pm:${id}] ${prev} -> ${status}`));
 
@@ -112,10 +117,31 @@ function start() {
  * autostart, evitando relanzar apps que ya están accesibles.
  */
 async function bootstrap(app) {
-  const { pm, eventLog, config } = app.locals;
+  const { pm, pidStore, eventLog, config } = app.locals;
   const apps = config.apps;
   const timeoutMs = config.settings.healthTimeoutMs;
 
+  // 1) Re-adoptar procesos huérfanos vivos de una ejecución anterior (#24).
+  let adoptedIds = [];
+  try {
+    const r = await adoptOrphans(pm, apps, pidStore, {
+      timeoutMs,
+      onAdopt: (id, method) => {
+        console.log(`[LaunchApps] adoptada ${id} (verificada por ${method})`);
+        if (eventLog) eventLog.record(id, 'info', 'adopted', `proceso huérfano re-adoptado (verificado por ${method}); sus logs no se recapturan hasta un restart`);
+      },
+      onStale: (id) => console.log(`[LaunchApps] PID guardado de ${id} ya no existe (limpiado)`),
+      onUnverified: (id, pid) => {
+        console.warn(`[LaunchApps] ${id}: PID ${pid} vivo pero NO verificado, no se adopta`);
+        if (eventLog) eventLog.record(id, 'warn', 'adopt-unverified', `PID ${pid} vivo pero no se pudo verificar su identidad; no se adopta`);
+      },
+    });
+    adoptedIds = r.adopted;
+  } catch (err) {
+    console.error('[LaunchApps] adopción falló:', err.message);
+  }
+
+  // 2) Detectar instancias externas (sin PID guardado) accesibles por health.
   let externalUp = [];
   try {
     externalUp = await reconcileExternal(pm, apps, {
@@ -129,8 +155,9 @@ async function bootstrap(app) {
     console.error('[LaunchApps] reconcile falló:', err.message);
   }
 
+  // 3) Autostart, evitando relanzar lo adoptado o ya accesible.
   runAutostart(pm, apps, {
-    skip: externalUp,
+    skip: adoptedIds.concat(externalUp),
     log: (m) => console.log(`[LaunchApps] ${m}`),
   });
 }

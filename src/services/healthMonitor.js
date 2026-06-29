@@ -49,6 +49,9 @@ class HealthMonitor extends EventEmitter {
     if (this.running) return; // evita solapamiento si un ciclo tarda más que el intervalo
     this.running = true;
     try {
+      // Liveness de procesos adoptados (#24): sin evento 'exit', sondear el PID.
+      if (typeof this.pm.checkAdoptedLiveness === 'function') this.pm.checkAdoptedLiveness();
+
       const timeoutMs = this.getSettings().healthTimeoutMs || 5000;
       const ids = this.pm.liveIds();
       await Promise.all(

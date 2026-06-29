@@ -20,11 +20,14 @@ const { STATES, canTransition, isLive } = require('./states');
 class ProcessManager extends EventEmitter {
   /**
    * @param {object[]} apps  apps validadas de la config
+   * @param {object} [opts]
+   * @param {import('./pidStore').PidStore} [opts.pidStore]  persistencia de PIDs (re-adopción, #24)
    */
-  constructor(apps = []) {
+  constructor(apps = [], { pidStore = null } = {}) {
     super();
     /** @type {Map<string, object>} */
     this.entries = new Map();
+    this.pidStore = pidStore;
     this.setApps(apps);
   }
 
@@ -56,6 +59,7 @@ class ProcessManager extends EventEmitter {
       exitCode: null,
       restarts: 0,
       intentionalStop: false,
+      adopted: false, // true si el PID se re-adoptó sin handle de proceso (#24)
     };
   }
 
@@ -88,6 +92,7 @@ class ProcessManager extends EventEmitter {
       startedAt: e.startedAt,
       exitCode: e.exitCode,
       restarts: e.restarts,
+      adopted: e.adopted,
     };
   }
 
@@ -115,6 +120,7 @@ class ProcessManager extends EventEmitter {
     this._setStatus(entry, STATES.STARTING);
     entry.intentionalStop = false;
     entry.exitCode = null;
+    entry.adopted = false; // proceso propio, con handle
 
     let child;
     try {
@@ -134,6 +140,7 @@ class ProcessManager extends EventEmitter {
     entry.child = child;
     entry.pid = child.pid;
     entry.startedAt = new Date().toISOString();
+    this._recordPid(entry);
 
     child.stdout && child.stdout.on('data', (c) => this.emit('log', { id, stream: 'stdout', chunk: c.toString() }));
     child.stderr && child.stderr.on('data', (c) => this.emit('log', { id, stream: 'stderr', chunk: c.toString() }));
@@ -153,6 +160,8 @@ class ProcessManager extends EventEmitter {
       entry.exitCode = code;
       entry.child = null;
       entry.pid = null;
+      entry.adopted = false;
+      if (this.pidStore) this.pidStore.remove(id);
       const intentional = entry.intentionalStop;
       this.emit('exit', { id, code, signal, intentional });
       if (intentional) {
@@ -173,6 +182,12 @@ class ProcessManager extends EventEmitter {
    */
   stop(id, { markPaused = false } = {}) {
     const entry = this._get(id);
+
+    // Adoptado (#24): no hay child handle; matamos por PID y sondeamos su muerte.
+    if (!entry.child && entry.adopted && entry.pid) {
+      return this._stopAdopted(entry, markPaused);
+    }
+
     if (!entry.child) {
       if (markPaused) this._setStatus(entry, STATES.PAUSED);
       else this._setStatus(entry, STATES.STOPPED);
@@ -200,6 +215,30 @@ class ProcessManager extends EventEmitter {
           done();
         }
       }, 8000);
+    });
+  }
+
+  /** Para un proceso adoptado (sin handle): taskkill + polling de muerte del PID. */
+  _stopAdopted(entry, markPaused) {
+    const id = entry.app.id;
+    const pid = entry.pid;
+    return new Promise((resolve) => {
+      killTree(pid, (err) => {
+        if (err) this.emit('warn', { id, message: `kill falló: ${err.message}` });
+      });
+      const start = Date.now();
+      const poll = () => {
+        if (!isPidAlive(pid) || Date.now() - start > 8000) {
+          entry.child = null;
+          entry.pid = null;
+          entry.adopted = false;
+          if (this.pidStore) this.pidStore.remove(id);
+          this._setStatus(entry, markPaused ? STATES.PAUSED : STATES.STOPPED);
+          return resolve({ id, status: entry.status });
+        }
+        setTimeout(poll, 200);
+      };
+      poll();
     });
   }
 
@@ -251,6 +290,59 @@ class ProcessManager extends EventEmitter {
       this._setStatus(entry, STATES.RUNNING);
     }
   }
+
+  // ---------- Re-adopción de huérfanos (#24) ----------
+
+  /** Guarda el PID actual de una app en el pidStore. */
+  _recordPid(entry) {
+    if (!this.pidStore || !entry.pid) return;
+    const { app } = entry;
+    this.pidStore.set(app.id, {
+      pid: entry.pid,
+      command: app.command,
+      args: app.args || [],
+      port: app.port || null,
+      startedAt: entry.startedAt,
+    });
+  }
+
+  /**
+   * Re-adopta un proceso vivo que el panel no lanzó (tras reinicio del panel).
+   * No hay handle: stop usará taskkill por PID y NO se capturan sus logs hasta
+   * que se reinicie desde el panel.
+   * @param {string} id
+   * @param {number} pid
+   * @param {object} [info]  { startedAt }
+   */
+  adopt(id, pid, info = {}) {
+    const entry = this._get(id);
+    entry.child = null;
+    entry.pid = pid;
+    entry.adopted = true;
+    entry.startedAt = info.startedAt || new Date().toISOString();
+    entry.intentionalStop = false;
+    this._setStatus(entry, STATES.RUNNING);
+    this._recordPid(entry);
+    return { id, status: entry.status, pid, adopted: true };
+  }
+
+  /**
+   * Liveness de procesos adoptados (#24): como no hay evento 'exit', sondeamos
+   * si su PID sigue vivo. Si murió, lo marcamos crashed. Lo llama el monitor.
+   */
+  checkAdoptedLiveness() {
+    for (const entry of this.entries.values()) {
+      if (entry.adopted && entry.pid && isLive(entry.status) && !isPidAlive(entry.pid)) {
+        const id = entry.app.id;
+        entry.child = null;
+        entry.pid = null;
+        entry.adopted = false;
+        if (this.pidStore) this.pidStore.remove(id);
+        this.emit('exit', { id, code: null, signal: null, intentional: false });
+        this._setStatus(entry, STATES.CRASHED);
+      }
+    }
+  }
 }
 
 /** Mata el árbol de procesos. Windows: taskkill /T /F. POSIX: SIGTERM al grupo/pid. */
@@ -267,6 +359,17 @@ function killTree(pid, cb = () => {}) {
     } catch (err) {
       cb(err);
     }
+  }
+}
+
+/** ¿Existe un proceso con ese PID? Usa signal 0 (no lo mata, solo comprueba). */
+function isPidAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === 'EPERM'; // existe pero sin permisos -> sigue vivo
   }
 }
 
@@ -289,4 +392,4 @@ function waitPortFree(port, timeoutMs = 5000) {
   });
 }
 
-module.exports = { ProcessManager, killTree, waitPortFree };
+module.exports = { ProcessManager, killTree, waitPortFree, isPidAlive };

@@ -83,6 +83,7 @@ body {
 .status-crashed { background: rgba(231, 76, 60, 0.18); color: var(--bad); }
 
 .warn { color: #f39c12; font-size: 0.85rem; }
+.adopted-mark { cursor: help; }
 
 .actions button {
   background: transparent;

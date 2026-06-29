@@ -13,7 +13,21 @@
   function applyState(s) {
     var tr = row(s.id); if (!tr) return;
     var el = tr.querySelector('[data-role="status"]');
-    if (el) { el.textContent = s.status; el.className = 'status ' + (STATUS_CLASS[s.status] || 'status-stopped'); }
+    if (el) {
+      el.textContent = s.status;
+      el.className = 'status ' + (STATUS_CLASS[s.status] || 'status-stopped');
+      var td = el.parentNode;
+      var mark = td.querySelector('.adopted-mark');
+      if (s.adopted) {
+        if (!mark) {
+          mark = document.createElement('span');
+          mark.className = 'adopted-mark';
+          mark.textContent = ' ⚓';
+          mark.title = 'Proceso adoptado tras reinicio del panel. Sus logs no se recapturan hasta un restart.';
+          el.insertAdjacentElement('afterend', mark);
+        }
+      } else if (mark) { mark.remove(); }
+    }
   }
   function applyHealth(h) {
     var tr = row(h.id); if (!tr) return;
@@ -138,6 +152,13 @@
   function openLogs(id) {
     $('#modal-logs-title').textContent = 'Logs — ' + id;
     var out = $('#logs-output'); out.textContent = '';
+    var tr = row(id);
+    if (tr && tr.querySelector('.adopted-mark')) {
+      var note = document.createElement('div');
+      note.className = 'log-line log-system';
+      note.textContent = '⚓ App adoptada: los logs previos no se capturaron. Reiniciala desde el panel para capturar su salida.';
+      out.appendChild(note);
+    }
     $('#modal-logs').classList.remove('hidden');
     logsES = new EventSource('/apps/' + encodeURIComponent(id) + '/logs');
     logsES.addEventListener('log', function (e) {

@@ -166,7 +166,9 @@ src/
     health/{tcp,http,command,aggregate}.js  checkers + detección de colgado
     watchdog.js          auto-relanzado por app con backoff
     autostart.js         lanzamiento escalonado al arrancar
-    reconcile.js         detección de instancias externas/huérfanas
+    reconcile.js         detección de instancias externas
+    adopt.js             re-adopción de procesos huérfanos (verifica identidad)
+    pidStore.js          persistencia de PIDs (data/processes.json)
     logStore.js          captura de logs (buffer + archivo)
     eventLog.js          persistencia de eventos (JSONL)
   routes/                index, events, actions, config, logs
@@ -187,10 +189,15 @@ ecosystem.config.js      config pm2 del panel
   a estar sana (verás un evento `give-up`).
 - **Cambios en `apps.json` no se aplican** → se recargan solos (watch). Si editaste
   con un editor que hace escritura atómica rara, reiniciá el panel.
-- **Huérfanos tras reiniciar el panel**: los procesos NO se re-adoptan (v1). Si una
-  app sigue viva tras reiniciar el panel, se detecta por health y se registra un
-  aviso (`external`); el autostart no la duplica. Para gestionarla de nuevo,
-  parala por fuera y usá el panel, o reiniciala desde el panel.
+- **Huérfanos tras reiniciar el panel**: el panel **re-adopta** los procesos que
+  siguen vivos. Al spawnear guarda los PID en `data/processes.json`; al arrancar,
+  por cada app con PID vivo verifica su identidad (health OK si hay health, o
+  coincidencia de command-line si no) y la adopta (estado `running`, marcada con
+  ⚓). Un proceso adoptado se puede parar/reiniciar normalmente, pero **sus logs
+  no se recapturan** hasta que lo reinicies desde el panel (no hay handle del
+  proceso). Si un PID está vivo pero no se puede verificar, no se adopta (se
+  registra un aviso `adopt-unverified`); si una instancia externa sin PID guardado
+  responde, se registra como `external`. En ambos casos el autostart no la duplica.
 
 ## Roadmap (hecho)
 
