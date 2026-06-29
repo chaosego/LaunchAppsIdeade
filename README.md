@@ -145,6 +145,7 @@ pm2 startup          # seguir la instrucción que imprime para arrancar con el S
 | GET | `/apps/:id/logs` | SSE: logs en vivo de una app |
 | GET | `/apps/:id/logs/query` | Logs con búsqueda/filtro/paginación (`search`,`stream`,`from`,`to`,`page`,`limit`) |
 | POST | `/apps/:id/{start,stop,restart,pause,resume}` | Acción por app |
+| POST | `/apps/:id/adopt` | Adoptar un proceso externo (descubre el PID por el puerto) |
 | POST | `/apps/{start-all,stop-all,restart-all,refresh-all}` | Acciones globales |
 | GET | `/config/apps` | Lista settings + apps |
 | POST | `/config/apps` | Alta de app |
@@ -200,6 +201,15 @@ ecosystem.config.js      config pm2 del panel
   proceso). Si un PID está vivo pero no se puede verificar, no se adopta (se
   registra un aviso `adopt-unverified`); si una instancia externa sin PID guardado
   responde, se registra como `external`. En ambos casos el autostart no la duplica.
+- **Adoptar un proceso externo manualmente** (lanzado fuera del panel, o huérfano
+  viejo sin PID guardado): botón **⚓+** en la fila. Descubre el PID **por el `port`**
+  de la app (`Get-NetTCPConnection`/`netstat`); si la app **no tiene puerto**, cae a
+  un **match por command-line** (enumera procesos y compara con los args/comando de
+  la app). En ambos casos **escala al PID raíz del árbol** por PPID (para que
+  stop/restart maten todo, no dejen un wrapper colgando) y, si hay `health`, exige
+  que responda antes de adoptar. Si varios procesos coinciden por command-line el
+  match es **ambiguo** y se pide añadir `port` para desambiguar. Igual que toda
+  adopción, sus logs no se recapturan hasta un restart.
 
 ## Roadmap (hecho)
 

@@ -1,6 +1,9 @@
 'use strict';
 
 const express = require('express');
+const { discoverPid } = require('../services/procDiscovery');
+const { runHealth } = require('../services/health/aggregate');
+const { isPidAlive } = require('../services/processManager');
 
 /**
  * Endpoints de acción sobre apps (issues #13, #14).
@@ -63,6 +66,43 @@ function createActionsRouter() {
     const monitor = req.app.locals.healthMonitor;
     if (monitor) await monitor.tick();
     res.json({ ok: true, action: 'refresh-all', state: req.app.locals.pm.getAll() });
+  });
+
+  // --- Adopción manual de un proceso externo (#24) ---
+  router.post('/:id/adopt', async (req, res) => {
+    const { id } = req.params;
+    const pm = req.app.locals.pm;
+    const eventLog = req.app.locals.eventLog;
+
+    let app;
+    try { app = pm.getApp(id); } catch (err) { return res.status(404).json({ ok: false, error: err.message }); }
+
+    if (['running', 'unhealthy', 'starting'].includes(pm.getState(id).status)) {
+      return res.status(409).json({ ok: false, error: 'la app ya está gestionada/viva' });
+    }
+
+    let found;
+    try { found = await discoverPid(app); } catch (err) { return res.status(500).json({ ok: false, error: err.message }); }
+    if (found && found.ambiguous) {
+      return res.status(409).json({ ok: false, error: `${found.count} procesos coinciden por command-line; añadí 'port' a la app para desambiguar` });
+    }
+    if (!found || !isPidAlive(found.pid)) {
+      const how = app.port ? `escuchando en el puerto ${app.port} ni por command-line` : 'por command-line (la app no tiene puerto)';
+      return res.status(404).json({ ok: false, error: `no se encontró un proceso ${how}` });
+    }
+
+    // Verificación: si hay health configurado, exigir que responda.
+    if (app.health && (app.health.http || app.health.tcp)) {
+      const timeoutMs = req.app.locals.config.settings.healthTimeoutMs;
+      const r = await runHealth(app, { timeoutMs });
+      if (!r.healthy) {
+        return res.status(422).json({ ok: false, error: `proceso hallado (PID ${found.pid}) pero el health no responde; no se adopta` });
+      }
+    }
+
+    const result = pm.adopt(id, found.pid);
+    if (eventLog) eventLog.record(id, 'info', 'adopted-manual', `proceso externo adoptado (PID ${found.pid}, via ${found.via}, listener ${found.listener}); sus logs no se recapturan hasta un restart`);
+    res.json({ ok: true, action: 'adopt', id, ...found, state: pm.getState(id) });
   });
 
   // --- Acción por app ---

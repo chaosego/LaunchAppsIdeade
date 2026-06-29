@@ -140,6 +140,22 @@
   }
   function showFormError(msg) { var b = $('#app-form-error'); b.textContent = msg; b.classList.remove('hidden'); }
 
+  function adoptApp(id, btn) {
+    if (btn) btn.disabled = true;
+    fetch('/apps/' + encodeURIComponent(id) + '/adopt', { method: 'POST' })
+      .then(function (r) { return r.json().then(function (d) { return { code: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.d.ok) {
+          applyState(res.d.state);
+          toast({ level: 'info', id: id, message: 'adoptado (PID ' + res.d.pid + ')' });
+        } else {
+          toast({ level: 'error', id: id, message: res.d.error || 'no se pudo adoptar' });
+        }
+      })
+      .catch(function (err) { toast({ level: 'error', id: id, message: err.message }); })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+
   function delApp(id) {
     if (!confirm('¿Eliminar la app "' + id + '"? Se detendrá si está corriendo.')) return;
     fetch('/config/apps/' + encodeURIComponent(id), { method: 'DELETE' })
@@ -227,6 +243,7 @@
     if (btn.dataset.action && id) return post('/apps/' + encodeURIComponent(id) + '/' + btn.dataset.action, btn);
     if (btn.dataset.global) return post('/apps/' + btn.dataset.global, btn);
     if (btn.id === 'btn-add') return openForm(null);
+    if (btn.hasAttribute('data-adopt') && id) return adoptApp(id, btn);
     if (btn.hasAttribute('data-delete') && id) return delApp(id);
     if (btn.hasAttribute('data-logs') && id) return openLogs(id);
     if (btn.hasAttribute('data-edit') && id) {
