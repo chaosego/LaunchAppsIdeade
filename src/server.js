@@ -4,7 +4,9 @@ const path = require('path');
 const express = require('express');
 const { loadConfig } = require('./config/loader');
 const { ProcessManager } = require('./services/processManager');
+const { HealthMonitor } = require('./services/healthMonitor');
 const createIndexRouter = require('./routes/index');
+const createEventsRouter = require('./routes/events');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -19,6 +21,9 @@ function createApp() {
   app.locals.pm.on('warn', ({ id, message }) => console.warn(`[pm:${id}] ${message}`));
   app.locals.pm.on('state', ({ id, prev, status }) => console.log(`[pm:${id}] ${prev} -> ${status}`));
 
+  // Monitor de health (M2): polling periódico + transiciones running<->unhealthy.
+  app.locals.healthMonitor = new HealthMonitor(app.locals.pm, () => app.locals.config.settings);
+
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
 
@@ -27,6 +32,7 @@ function createApp() {
   app.use('/static', express.static(path.join(ROOT, 'public')));
 
   app.use('/', createIndexRouter());
+  app.use('/events', createEventsRouter());
 
   // 404 simple
   app.use((req, res) => {
@@ -48,6 +54,7 @@ function start() {
     if (errors.length) {
       for (const e of errors) console.warn(`[config] ${e}`);
     }
+    app.locals.healthMonitor.start();
   });
 }
 

@@ -219,6 +219,29 @@ class ProcessManager extends EventEmitter {
   isPaused(id) {
     return this._get(id).status === STATES.PAUSED;
   }
+
+  /** Devuelve la config de la app. */
+  getApp(id) {
+    return this._get(id).app;
+  }
+
+  /** Ids de apps con proceso vivo esperado (running/unhealthy/starting). */
+  liveIds() {
+    return [...this.entries.values()].filter((e) => isLive(e.status)).map((e) => e.app.id);
+  }
+
+  /**
+   * Aplica el veredicto del health check (M2): transiciona running <-> unhealthy.
+   * Solo actúa si la app está viva; nunca pisa starting/stopped/paused/crashed.
+   */
+  applyHealth(id, healthy) {
+    const entry = this._get(id);
+    if (entry.status === STATES.RUNNING && !healthy) {
+      this._setStatus(entry, STATES.UNHEALTHY);
+    } else if (entry.status === STATES.UNHEALTHY && healthy) {
+      this._setStatus(entry, STATES.RUNNING);
+    }
+  }
 }
 
 /** Mata el árbol de procesos. Windows: taskkill /T /F. POSIX: SIGTERM al grupo/pid. */
