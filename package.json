@@ -1,0 +1,18 @@
+{
+  "name": "launchapps",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Panel web local para monitorizar, lanzar y auto-relanzar apps locales (Next/Node/Sails).",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.19.2"
+  }
+}

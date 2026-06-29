@@ -1,0 +1,55 @@
+<%- include('partials/head') %>
+
+<% if (configErrors && configErrors.length) { %>
+  <section class="banner banner-warn">
+    <strong>Avisos de configuración (<%= configSource %>):</strong>
+    <ul>
+      <% configErrors.forEach(function (e) { %>
+        <li><%= e %></li>
+      <% }); %>
+    </ul>
+  </section>
+<% } %>
+
+<section class="apps">
+  <% if (!apps.length) { %>
+    <p class="empty">No hay apps configuradas. Editá <code>apps.json</code> (plantilla en <code>apps.example.json</code>).</p>
+  <% } else { %>
+    <table class="apps-table">
+      <thead>
+        <tr>
+          <th>App</th>
+          <th>Tipo</th>
+          <th>Puerto</th>
+          <th>Estado</th>
+          <th>Autostart</th>
+          <th>Watchdog</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% apps.forEach(function (app) { %>
+          <tr data-app-id="<%= app.id %>">
+            <td>
+              <span class="app-name"><%= app.name %></span>
+              <span class="app-id muted"><%= app.id %></span>
+            </td>
+            <td><%= app.type %></td>
+            <td><%= app.port || '—' %></td>
+            <td><span class="status status-unknown" data-role="status">desconocido</span></td>
+            <td><%= app.autostart ? 'sí' : 'no' %></td>
+            <td><%= app.watchdog && app.watchdog.enabled ? app.watchdog.intervalMinutes + ' min' : 'off' %></td>
+            <td class="actions">
+              <!-- Botones reales en M3 -->
+              <button disabled title="Disponible en M3">start</button>
+              <button disabled title="Disponible en M3">stop</button>
+              <button disabled title="Disponible en M3">restart</button>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<%- include('partials/foot') %>

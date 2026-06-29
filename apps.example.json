@@ -1,0 +1,50 @@
+{
+  "settings": {
+    "port": 4000,
+    "watchdogDefaultIntervalMinutes": 150,
+    "healthTimeoutMs": 5000,
+    "statusPollIntervalMs": 10000
+  },
+  "apps": [
+    {
+      "id": "web-next",
+      "name": "Web Next",
+      "type": "next",
+      "cwd": "C:/proyectos/web-next",
+      "command": "npm",
+      "args": ["run", "start"],
+      "env": { "NODE_ENV": "production" },
+      "port": 3000,
+      "autostart": true,
+      "health": {
+        "http": { "url": "http://localhost:3000/", "expectStatus": 200 },
+        "tcp": { "port": 3000 },
+        "latencyWarnMs": 2000,
+        "command": { "run": "curl -fsS http://localhost:3000/", "timeoutMs": 4000 }
+      },
+      "watchdog": {
+        "enabled": true,
+        "intervalMinutes": 150,
+        "restartOnUnhealthy": true
+      }
+    },
+    {
+      "id": "api-sails",
+      "name": "API Sails",
+      "type": "sails",
+      "cwd": "C:/proyectos/api-sails",
+      "command": "node",
+      "args": ["app.js"],
+      "port": 1337,
+      "autostart": false,
+      "health": {
+        "tcp": { "port": 1337 },
+        "http": { "url": "http://localhost:1337/health", "expectStatus": 200 },
+        "latencyWarnMs": 3000
+      },
+      "watchdog": {
+        "enabled": false
+      }
+    }
+  ]
+}

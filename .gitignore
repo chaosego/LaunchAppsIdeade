@@ -1,0 +1,17 @@
+node_modules/
+npm-debug.log*
+
+# Config real con rutas locales (usar apps.example.json como plantilla)
+apps.json
+
+# Datos de runtime
+logs/
+data/
+*.log
+*.stackdump
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
