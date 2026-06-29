@@ -194,6 +194,19 @@ button.primary {
 
 /* Logs */
 .modal-logs-box { width: min(820px, 94vw); }
+.logs-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.logs-toolbar input[type="search"] {
+  flex: 1; min-width: 140px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 0.35rem 0.5rem;
+}
+.logs-toolbar select, .logs-toolbar button {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 0.35rem 0.5rem; cursor: pointer;
+}
+.logs-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.logs-toolbar .check { display: flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; color: var(--text); }
+#logs-count { margin-left: auto; font-size: 0.78rem; }
 .logs-output {
   background: #0a0c10;
   border: 1px solid var(--border);

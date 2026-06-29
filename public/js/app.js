@@ -149,28 +149,74 @@
 
   // ---------- Logs ----------
   var logsES = null;
+  var logsState = { id: null, page: 0, search: '', stream: 'all', searchTimer: null };
+
+  function lineEl(entry) {
+    var div = document.createElement('div');
+    div.className = 'log-line log-' + entry.stream;
+    div.textContent = entry.line;
+    return div;
+  }
+  function matchesFilter(entry) {
+    if (logsState.stream !== 'all' && entry.stream !== logsState.stream) return false;
+    if (logsState.search && entry.line.toLowerCase().indexOf(logsState.search.toLowerCase()) === -1) return false;
+    return true;
+  }
+  function logsQuery(append) {
+    var id = logsState.id, out = $('#logs-output');
+    var qs = '?limit=200&page=' + logsState.page +
+      '&stream=' + encodeURIComponent(logsState.stream) +
+      (logsState.search ? '&search=' + encodeURIComponent(logsState.search) : '');
+    return fetch('/apps/' + encodeURIComponent(id) + '/logs/query' + qs)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var frag = document.createDocumentFragment();
+        (d.entries || []).forEach(function (e) { frag.appendChild(lineEl(e)); });
+        if (append) { // página más antigua -> al principio, preservando scroll
+          var prevH = out.scrollHeight;
+          out.insertBefore(frag, out.firstChild);
+          out.scrollTop = out.scrollHeight - prevH;
+        } else {
+          out.innerHTML = ''; out.appendChild(frag); out.scrollTop = out.scrollHeight;
+        }
+        $('#logs-count').textContent = d.total + ' líneas';
+        $('#logs-older').disabled = (logsState.page + 1) * d.limit >= d.total;
+      });
+  }
+  function reloadLogs() { logsState.page = 0; logsQuery(false); }
+
   function openLogs(id) {
+    logsState.id = id; logsState.page = 0;
+    logsState.search = $('#logs-search').value = '';
+    logsState.stream = $('#logs-stream').value = 'all';
+    $('#logs-live').checked = true;
     $('#modal-logs-title').textContent = 'Logs — ' + id;
     var out = $('#logs-output'); out.textContent = '';
     var tr = row(id);
     if (tr && tr.querySelector('.adopted-mark')) {
       var note = document.createElement('div');
       note.className = 'log-line log-system';
-      note.textContent = '⚓ App adoptada: los logs previos no se capturaron. Reiniciala desde el panel para capturar su salida.';
+      note.textContent = '⚓ App adoptada: stream en vivo no disponible hasta reiniciarla desde el panel. Se muestran logs persistidos.';
       out.appendChild(note);
     }
     $('#modal-logs').classList.remove('hidden');
-    logsES = new EventSource('/apps/' + encodeURIComponent(id) + '/logs');
+    logsQuery(false).then(startLogsLive);
+  }
+  function startLogsLive() {
+    stopLogsLive();
+    if (!$('#logs-live').checked) return;
+    logsES = new EventSource('/apps/' + encodeURIComponent(logsState.id) + '/logs');
     logsES.addEventListener('log', function (e) {
+      if (logsState.page !== 0) return; // viendo historial antiguo: no autoscroll
       var entry = JSON.parse(e.data);
-      var line = document.createElement('div');
-      line.className = 'log-line log-' + entry.stream;
-      line.textContent = entry.line;
-      out.appendChild(line);
+      if (!matchesFilter(entry)) return;
+      var out = $('#logs-output');
+      out.appendChild(lineEl(entry));
       out.scrollTop = out.scrollHeight;
     });
   }
-  function closeLogs() { if (logsES) { logsES.close(); logsES = null; } $('#modal-logs').classList.add('hidden'); }
+  function stopLogsLive() { if (logsES) { logsES.close(); logsES = null; } }
+  function closeLogs() { stopLogsLive(); $('#modal-logs').classList.add('hidden'); }
 
   // ---------- Wiring ----------
   document.addEventListener('click', function (e) {
@@ -194,6 +240,16 @@
     }
   });
   document.addEventListener('submit', function (e) { if (e.target.id === 'app-form') submitForm(e); });
+
+  // Controles del viewer de logs
+  $('#logs-search').addEventListener('input', function (e) {
+    clearTimeout(logsState.searchTimer);
+    var v = e.target.value;
+    logsState.searchTimer = setTimeout(function () { logsState.search = v; reloadLogs(); }, 300);
+  });
+  $('#logs-stream').addEventListener('change', function (e) { logsState.stream = e.target.value; reloadLogs(); });
+  $('#logs-older').addEventListener('click', function () { logsState.page += 1; logsQuery(true); });
+  $('#logs-live').addEventListener('change', function () { startLogsLive(); });
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 

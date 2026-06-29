@@ -15,7 +15,8 @@ marcadas con autostart.
   límite de reintentos.
 - **Autostart** escalonado al arrancar el panel.
 - **CRUD de apps** desde la UI + **recarga en caliente** al editar `apps.json`.
-- **Logs en vivo** (stdout/stderr) por app.
+- **Logs en vivo** (stdout/stderr) por app, persistidos en JSONL con búsqueda,
+  filtro por stream y paginación; el historial sobrevive reinicios del panel.
 - **Log de eventos** persistido + notificaciones (toasts) en la UI.
 
 ## Requisitos
@@ -142,6 +143,7 @@ pm2 startup          # seguir la instrucción que imprime para arrancar con el S
 | GET | `/events/status` | SSE: snapshot + estado + health + eventos |
 | GET | `/events/log?limit=N` | Historial de eventos |
 | GET | `/apps/:id/logs` | SSE: logs en vivo de una app |
+| GET | `/apps/:id/logs/query` | Logs con búsqueda/filtro/paginación (`search`,`stream`,`from`,`to`,`page`,`limit`) |
 | POST | `/apps/:id/{start,stop,restart,pause,resume}` | Acción por app |
 | POST | `/apps/{start-all,stop-all,restart-all,refresh-all}` | Acciones globales |
 | GET | `/config/apps` | Lista settings + apps |

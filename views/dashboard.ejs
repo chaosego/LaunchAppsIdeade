@@ -103,6 +103,18 @@
 <div id="modal-logs" class="modal hidden">
   <div class="modal-box modal-logs-box">
     <h2 id="modal-logs-title">Logs</h2>
+    <div class="logs-toolbar">
+      <input id="logs-search" type="search" placeholder="Buscar…" />
+      <select id="logs-stream">
+        <option value="all">Todos</option>
+        <option value="stdout">stdout</option>
+        <option value="stderr">stderr</option>
+        <option value="system">sistema</option>
+      </select>
+      <button id="logs-older" type="button" title="Cargar más antiguos">↑ Más antiguos</button>
+      <label class="check"><input id="logs-live" type="checkbox" checked /> En vivo</label>
+      <span id="logs-count" class="muted"></span>
+    </div>
     <pre id="logs-output" class="logs-output"></pre>
     <div class="modal-actions"><button type="button" data-close>Cerrar</button></div>
   </div>

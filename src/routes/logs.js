@@ -9,6 +9,18 @@ const express = require('express');
 function createLogsRouter() {
   const router = express.Router();
 
+  // Consulta con búsqueda / filtro / paginación (no SSE).
+  router.get('/:id/logs/query', (req, res) => {
+    const { id } = req.params;
+    const pm = req.app.locals.pm;
+    const logStore = req.app.locals.logStore;
+    try { pm.getApp(id); } catch (err) { return res.status(404).json({ ok: false, error: err.message }); }
+    const { search, stream, from, to } = req.query;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 200, 1000);
+    const page = Math.max(parseInt(req.query.page, 10) || 0, 0);
+    res.json(logStore.query(id, { search, stream, from, to, limit, page }));
+  });
+
   router.get('/:id/logs', (req, res) => {
     const { id } = req.params;
     const pm = req.app.locals.pm;
